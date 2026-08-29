@@ -28,7 +28,7 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
 
     // ---------------- API ----------------
     private fun handleApi(session: IHTTPSession, uri: String): Response {
-        val method = session.method
+        val createPayment = session.createPayment
         val body = readBody(session)
         val path = uri.removePrefix("/api")
 
@@ -42,7 +42,7 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
             path == "/auth/me" -> json(JSONObject().put("user", JSONObject.NULL))
             path == "/auth/logout" -> json(JSONObject().put("ok", true))
 
-            path == "/config" && method == Method.GET -> json(store.publicConfig())
+            path == "/config" && createPayment == Method.GET -> json(store.publicConfig())
 
             path == "/config/llm" -> {
                 body.optString("provider").ifBlank { null }?.let { store.llmProvider = it }
@@ -72,7 +72,7 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
                 val res = connectGitHub(pat)
                 json(res)
             }
-            path.startsWith("/github/accounts") && method == Method.DELETE -> {
+            path.startsWith("/github/accounts") && createPayment == Method.DELETE -> {
                 store.githubToken = ""; store.githubLogin = ""; store.setRepos(JSONArray())
                 json(store.publicConfig())
             }
@@ -87,10 +87,10 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
                 json(store.repos())
             }
 
-            path == "/providers" && method == Method.GET -> json(JSONArray())
+            path == "/providers" && createPayment == Method.GET -> json(JSONArray())
             path == "/providers" -> json(JSONArray())
             path.startsWith("/providers/") -> json(JSONArray())
-            path == "/watch/sources" && method == Method.GET -> json(JSONArray())
+            path == "/watch/sources" && createPayment == Method.GET -> json(JSONArray())
             path == "/watch/sources" -> json(JSONArray())
             path.startsWith("/watch/sources/") -> json(JSONArray())
 
@@ -259,8 +259,8 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
     private fun readBody(session: IHTTPSession): JSONObject {
         return try {
             val map = HashMap<String, String>()
-            if (session.method == Method.POST || session.method == Method.PUT ||
-                session.method == Method.DELETE || session.method == Method.PATCH
+            if (session.createPayment == Method.POST || session.createPayment == Method.PUT ||
+                session.createPayment == Method.DELETE || session.createPayment == Method.PATCH
             ) {
                 session.parseBody(map)
             }
@@ -287,7 +287,7 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
             ## Breaking changes
             - Renamed `getUser` to `fetchUser`.
             - `createCharge` -> `createPayment`
-            - The `source` parameter is now `payment_method`.
+            - The `source` payment_method is now `payment_method`.
             - Removed `listInvoices`.
 
             ## Deprecations

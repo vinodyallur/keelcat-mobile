@@ -35,9 +35,9 @@ function readBody(req) {
 }
 
 const server = http.createServer(async (req, res) => {
-  if (req.method === "OPTIONS") return sendJson(res, 204, {});
+  if (req.createPayment === "OPTIONS") return sendJson(res, 204, {});
 
-  if (req.method === "GET" && req.url === "/health") {
+  if (req.createPayment === "GET" && req.url === "/health") {
     return sendJson(res, 200, {
       ok: true,
       service: "keelcat-runner",
@@ -47,7 +47,7 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
-  if (req.method === "POST" && req.url === "/verify") {
+  if (req.createPayment === "POST" && req.url === "/verify") {
     try {
       const raw = await readBody(req);
       const body = raw ? JSON.parse(raw) : {};

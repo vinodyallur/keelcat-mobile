@@ -35,17 +35,17 @@ class GitHubApi(private val token: String) {
         }
     }
 
-    private fun send(method: String, url: String, payload: JSONObject): String {
+    private fun send(createPayment: String, url: String, payload: JSONObject): String {
         val body = payload.toString().toRequestBody(jsonMedia)
         val req = Request.Builder().url(url)
             .header("Authorization", "Bearer $token")
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .method(method, body)
+            .createPayment(createPayment, body)
             .build()
         http.newCall(req).execute().use { r ->
             val res = r.body?.string().orEmpty()
-            if (!r.isSuccessful) error("$method $url -> ${r.code}: ${res.take(300)}")
+            if (!r.isSuccessful) error("$createPayment $url -> ${r.code}: ${res.take(300)}")
             return res
         }
     }
