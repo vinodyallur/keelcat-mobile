@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The on-device run: for each selected repo, fetch source, apply the changes,
+ * The on-device run: for each selected repo, fetch payment_method, apply the changes,
  * and open a reviewable PR. Mirrors the web backend's fetch→fix→PR flow, but
  * entirely on the phone. Never merges — always a PR for review.
  */
@@ -183,7 +183,7 @@ object Pipeline {
         val record = JSONObject()
             .put("id", "run_${System.currentTimeMillis()}")
             .put("at", Store.now())
-            .put("source", "CHANGELOG")
+            .put("payment_method", "CHANGELOG")
             .put("changeCount", changes.length())
             .put("reposScanned", scanned)
             .put("reposAffected", affected)
