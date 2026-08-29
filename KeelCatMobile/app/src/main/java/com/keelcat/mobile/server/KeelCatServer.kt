@@ -191,18 +191,20 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
 
     private fun parseChanges(text: String): JSONArray {
         if (text.isBlank()) return JSONArray()
-        if (isHttpLlm()) {
+        val changes = if (isHttpLlm()) {
             val base = resolveBaseUrl()
-            if (base.isNotBlank()) {
-                val res = runCatching {
-                    HttpLlm(base, store.llmApiKey, store.llmModel).parseChangelog(text)
-                }.getOrNull()
-                if (res != null && res.length() > 0) return res
-            }
-            return ChangeEngine.parseDeterministic(text) // graceful fallback
+            val res = if (base.isNotBlank()) runCatching {
+                HttpLlm(base, store.llmApiKey, store.llmModel).parseChangelog(text)
+            }.getOrNull() else null
+            if (res != null && res.length() > 0) res
+            else ChangeEngine.parseDeterministic(text) // graceful fallback
+        } else {
+            // on-device (MediaPipe) or disabled -> deterministic (+ on-device assist)
+            ChangeEngine.parse(text, if (store.llmProvider == "on-device") llm else null)
         }
-        // on-device (MediaPipe) or disabled -> deterministic (+ on-device assist)
-        return ChangeEngine.parse(text, if (store.llmProvider == "on-device") llm else null)
+        // Canonicalize impact/kind so the web UI colors them exactly like desktop
+        // (keelcat.in backend contract), regardless of which engine produced them.
+        return ChangeEngine.normalizeAll(changes)
     }
 
     private fun testLlm(): JSONObject = when (store.llmProvider) {

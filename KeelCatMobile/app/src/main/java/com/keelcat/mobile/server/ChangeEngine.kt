@@ -13,22 +13,57 @@ import org.json.JSONObject
  */
 object ChangeEngine {
 
-    // Dotted identifiers (customers.create) but each segment is a real ident,
-    // so a trailing sentence period isn't captured.
-    private const val ID = "[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"
+    // A "strong" identifier: quoted ("x"), backticked (`x`) or single-quoted,
+    // optionally dotted (customers.create). These are the real API symbols in a
+    // changelog; plain English words (parameter, method, in, and) are never quoted.
+    private val QUOTED_ID = Regex("[`\"']([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)[`\"']")
+    // A bare identifier token (fallback when nothing is quoted).
+    private val BARE_ID = Regex("([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)")
+    // Phrases that join the old name (left) to the new name (right) in a rename.
+    private val RENAME_CONNECTORS = listOf(" to ", " with ", "->", "\u2192", "=>", "is now", "now called")
 
-    // `A` -> `B` / A → B / A => B
-    private val ARROW = Regex("[`\"]?($ID)[`\"]?\\s*(?:->|\u2192|=>)\\s*[`\"]?($ID)[`\"]?")
-    // renamed/replaced A to/with B
-    private val RENAMED = Regex("(?:renamed?|replaced)\\s+[`\"]?($ID)[`\"]?\\s+(?:to|with|by)\\s+[`\"]?($ID)[`\"]?", RegexOption.IGNORE_CASE)
-    // A is now B / A renamed to B / A now called B
-    private val IS_NOW = Regex("[`\"]?($ID)[`\"]?\\s+(?:is now|now called|renamed to|has been renamed to)\\s+[`\"]?($ID)[`\"]?", RegexOption.IGNORE_CASE)
-    // removed/deleted/dropped A  |  A was removed
-    private val REMOVED_PRE = Regex("(?:removed|deleted|dropped)\\s+[`\"]?($ID)[`\"]?", RegexOption.IGNORE_CASE)
-    private val REMOVED_POST = Regex("[`\"]?($ID)[`\"]?\\s+(?:was|is|has been)\\s+(?:removed|deleted|dropped)", RegexOption.IGNORE_CASE)
-    // deprecated A  |  A is deprecated
-    private val DEPRECATED_PRE = Regex("deprecated\\s+[`\"]?($ID)[`\"]?", RegexOption.IGNORE_CASE)
-    private val DEPRECATED_POST = Regex("[`\"]?($ID)[`\"]?\\s+is\\s+deprecated", RegexOption.IGNORE_CASE)
+    // Does a bare token look like code (dotted / camelCase / snake_case / has a
+    // digit)?  Filters out ordinary words so "parameter"/"method"/"in" are ignored.
+    private fun looksLikeCode(t: String): Boolean =
+        t.contains('.') || t.contains('_') || t.any { it.isDigit() } || Regex("[a-z][A-Z]").containsMatchIn(t)
+
+    // The primary symbol on a line: a quoted id if present, else the first
+    // code-like bare token.
+    private fun firstIdentifier(line: String, quoted: List<String>): String? =
+        quoted.firstOrNull()
+            ?: BARE_ID.findAll(line).map { it.groupValues[1] }.firstOrNull { looksLikeCode(it) }
+
+    // Earliest rename-connector position in the line as (index, length), or (-1, 0).
+    private fun connectorAt(line: String): Pair<Int, Int> {
+        var best = -1; var len = 0
+        val lower = line.lowercase()
+        for (c in RENAME_CONNECTORS) {
+            val i = lower.indexOf(c)
+            if (i >= 0 && (best < 0 || i < best)) { best = i; len = c.length }
+        }
+        return best to len
+    }
+
+    // (from, to) for a rename line: the id just before the connector -> the id
+    // just after it. Prefers quoted ids; falls back to code-like bare tokens.
+    private fun renamePair(line: String): Pair<String, String>? {
+        val q = QUOTED_ID.findAll(line).map { it.range.first to it.groupValues[1] }.toList()
+        val (idx, len) = connectorAt(line)
+        if (q.size >= 2) {
+            if (idx >= 0) {
+                val from = q.lastOrNull { it.first < idx }?.second
+                val to = q.firstOrNull { it.first > idx }?.second
+                if (from != null && to != null) return from to to
+            }
+            return q.first().second to q.last().second
+        }
+        if (idx >= 0) {
+            val from = BARE_ID.findAll(line.substring(0, idx)).map { it.groupValues[1] }.lastOrNull { looksLikeCode(it) }
+            val to = BARE_ID.findAll(line.substring(idx + len)).map { it.groupValues[1] }.firstOrNull { looksLikeCode(it) }
+            if (from != null && to != null) return from to to
+        }
+        return null
+    }
 
     /**
      * Deterministic parse first (fast, reliable). If it finds nothing and an
@@ -65,24 +100,31 @@ object ChangeEngine {
             val line = rawLine.trim()
             if (line.isEmpty()) continue
 
-            RENAMED.find(line)?.let { m ->
-                add(m.groupValues[1], kindForRename(m.groupValues[1], m.groupValues[2]), m.groupValues[1], m.groupValues[2], "BREAKING", line)
-            }
-            IS_NOW.find(line)?.let { m ->
-                add(m.groupValues[1], kindForRename(m.groupValues[1], m.groupValues[2]), m.groupValues[1], m.groupValues[2], "BREAKING", line)
-            }
-            // Arrow only if line hints at a rename/change (avoid matching prose arrows)
-            if (line.contains("->") || line.contains("\u2192") || line.contains("=>")) {
-                ARROW.find(line)?.let { m ->
-                    if (m.groupValues[1] != m.groupValues[2]) {
-                        add(m.groupValues[1], kindForRename(m.groupValues[1], m.groupValues[2]), m.groupValues[1], m.groupValues[2], "BREAKING", line)
+            val quoted = QUOTED_ID.findAll(line).map { it.groupValues[1] }.toList()
+            val lower = line.lowercase()
+            val isRename = lower.contains("renam") || lower.contains("is now") ||
+                lower.contains("now called") || lower.contains("replaced") ||
+                line.contains("->") || line.contains("\u2192") || line.contains("=>")
+            val isDeprecated = lower.contains("deprecat")
+            val isRemoved = lower.contains("removed") || lower.contains("deleted") || lower.contains("dropped")
+
+            // Deprecation wins over a "will be removed" mention on the same line.
+            when {
+                isDeprecated -> firstIdentifier(line, quoted)?.let {
+                    add(it, "SYMBOL_DEPRECATED", null, null, "DEPRECATION", line)
+                }
+                isRename -> {
+                    val pair = renamePair(line)
+                    if (pair != null && pair.first != pair.second) {
+                        add(pair.first, kindForRename(pair.first, pair.second), pair.first, pair.second, "BREAKING", line)
+                    } else if (isRemoved) {
+                        firstIdentifier(line, quoted)?.let { add(it, "SYMBOL_REMOVED", null, null, "BREAKING", line) }
                     }
                 }
+                isRemoved -> firstIdentifier(line, quoted)?.let {
+                    add(it, "SYMBOL_REMOVED", null, null, "BREAKING", line)
+                }
             }
-            REMOVED_PRE.find(line)?.let { m -> add(m.groupValues[1], "SYMBOL_REMOVED", null, null, "BREAKING", line) }
-            REMOVED_POST.find(line)?.let { m -> add(m.groupValues[1], "SYMBOL_REMOVED", null, null, "BREAKING", line) }
-            DEPRECATED_PRE.find(line)?.let { m -> add(m.groupValues[1], "SYMBOL_DEPRECATED", null, null, "DEPRECATION", line) }
-            DEPRECATED_POST.find(line)?.let { m -> add(m.groupValues[1], "SYMBOL_DEPRECATED", null, null, "DEPRECATION", line) }
         }
         return out
     }
@@ -91,6 +133,56 @@ object ChangeEngine {
         // Heuristic: snake/lower single words that read like params -> PARAM_RENAME
         val looksLikeParam = from.none { it == '.' } && from == from.lowercase() && to == to.lowercase()
         return if (looksLikeParam) "PARAM_RENAME" else "SYMBOL_RENAME"
+    }
+
+    // ---- enum canonicalization (parity with the keelcat.in web backend) ----
+    // The web UI colors changes by their exact `impact` value
+    // (BREAKING/DEPRECATION/NEW_FEATURE) and expects a fixed set of `kind`
+    // values. The deterministic parser already emits these, but an LLM (on-device
+    // or cloud) can return "deprecated", lowercase, or odd kinds. We map every
+    // change onto the canonical enums so the mobile UI colors them like desktop.
+    private val CANONICAL_KINDS = setOf(
+        "PARAM_RENAME", "SYMBOL_RENAME", "PARAM_REMOVED", "PARAM_ADDED_REQUIRED",
+        "SYMBOL_REMOVED", "SYMBOL_DEPRECATED", "SYMBOL_ADDED", "OTHER"
+    )
+
+    fun normalizeImpact(raw: String): String {
+        val s = raw.trim().uppercase()
+        return when {
+            s.contains("DEPREC") -> "DEPRECATION"
+            s.contains("BREAK") -> "BREAKING"
+            s.contains("FEATURE") || s.contains("NEW") || s.contains("ADD") -> "NEW_FEATURE"
+            else -> "BREAKING"
+        }
+    }
+
+    fun normalizeKind(raw: String, impact: String, hasFromTo: Boolean): String {
+        val s = raw.trim().uppercase().replace('-', '_').replace(' ', '_')
+        if (s in CANONICAL_KINDS) return s
+        return when {
+            s.contains("DEPREC") -> "SYMBOL_DEPRECATED"
+            s.contains("PARAM") && (s.contains("REMOV") || s.contains("DELET")) -> "PARAM_REMOVED"
+            s.contains("PARAM") && s.contains("ADD") -> "PARAM_ADDED_REQUIRED"
+            s.contains("PARAM") && s.contains("RENAM") -> "PARAM_RENAME"
+            s.contains("REMOV") || s.contains("DELET") || s.contains("DROP") -> "SYMBOL_REMOVED"
+            s.contains("RENAM") -> "SYMBOL_RENAME"
+            s.contains("ADD") -> "SYMBOL_ADDED"
+            impact == "DEPRECATION" -> "SYMBOL_DEPRECATED"
+            hasFromTo -> "SYMBOL_RENAME"
+            else -> "OTHER"
+        }
+    }
+
+    /** Canonicalize impact/kind on every change so the UI colors them like desktop. */
+    fun normalizeAll(arr: JSONArray): JSONArray {
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val impact = normalizeImpact(o.optString("impact"))
+            val hasFromTo = o.optString("from").isNotBlank() && o.optString("to").isNotBlank()
+            o.put("impact", impact)
+            o.put("kind", normalizeKind(o.optString("kind"), impact, hasFromTo))
+        }
+        return arr
     }
 
     /**
