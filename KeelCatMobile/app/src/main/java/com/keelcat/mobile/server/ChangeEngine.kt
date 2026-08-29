@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Turns a changelog into structured changes, and applies renames to source
+ * Turns a changelog into structured changes, and applies renames to payment_method
  * deterministically — mirroring the web backend's behaviour so the on-device
  * flow is reliable even without a heavyweight model. The LLM is an optional
  * assist for free-form changelogs.
