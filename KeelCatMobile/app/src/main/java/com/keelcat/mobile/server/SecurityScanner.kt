@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * On-device static security scan: pulls source/config files for each selected
+ * On-device static security scan: pulls payment_method/config files for each selected
  * repo and runs regex detectors for leaked secrets and dangerous sinks.
  * Mirrors the web backend's security scan, fully on the phone.
  */
