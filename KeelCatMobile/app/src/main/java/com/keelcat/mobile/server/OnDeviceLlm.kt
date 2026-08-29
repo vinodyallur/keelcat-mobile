@@ -2,6 +2,7 @@ package com.keelcat.mobile.server
 
 import android.content.Context
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -12,6 +13,8 @@ import java.io.File
  * reports not-ready and the pipeline falls back to deterministic parsing.
  *
  * This is the "runs on the phone's CPU/NPU" piece — no cloud, no API key.
+ * Uses the current tasks-genai session API: the engine holds the model, and a
+ * short-lived session carries the sampling options (topK/temperature).
  */
 class OnDeviceLlm(private val context: Context, private val modelPath: String) {
 
@@ -28,8 +31,6 @@ class OnDeviceLlm(private val context: Context, private val modelPath: String) {
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelPath)
                 .setMaxTokens(1024)
-                .setTopK(40)
-                .setTemperature(0.2f)
                 .build()
             llm = LlmInference.createFromOptions(context, options)
         } catch (t: Throwable) {
@@ -50,7 +51,8 @@ class OnDeviceLlm(private val context: Context, private val modelPath: String) {
             array of objects with keys: symbol, kind, from, to, impact, description.
             kind is one of: SYMBOL_RENAME, PARAM_RENAME, SYMBOL_REMOVED, SYMBOL_DEPRECATED.
             impact is one of: BREAKING, DEPRECATION, NEW_FEATURE.
-            If nothing breaks, return [].
+            For a rename, "from" is the OLD symbol name and "to" is the NEW symbol name
+            (not version numbers). If nothing breaks, return [].
 
             Changelog:
             ---
@@ -59,7 +61,16 @@ class OnDeviceLlm(private val context: Context, private val modelPath: String) {
             JSON:
         """.trimIndent()
 
-        val raw = runCatching { engine.generateResponse(prompt) }.getOrNull() ?: return JSONArray()
+        val raw = runCatching {
+            val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
+                .setTopK(40)
+                .setTemperature(0.2f)
+                .build()
+            LlmInferenceSession.createFromOptions(engine, sessionOptions).use { session ->
+                session.addQueryChunk(prompt)
+                session.generateResponse()
+            }
+        }.getOrNull() ?: return JSONArray()
         return extractArray(raw)
     }
 

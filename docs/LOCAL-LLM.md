@@ -71,11 +71,41 @@ In **Connect → LLM**:
 
 ---
 
-## Option C — On-device model (fully offline)
+## Option C — On-device model (fully offline, no laptop/network)
 
-Runs a small model on the phone via MediaPipe. See `RUNBOOK.md` → "put a small
-LLM on the phone" for pushing a Gemma `.task` bundle to
-`/data/local/tmp/llm/gemma.task`, then set Provider: **On-device (phone)**.
+Runs a small LLM on the phone itself via MediaPipe LLM Inference. Nothing leaves
+the device, and no cable/laptop/Ollama is needed once the model is on the phone.
+
+Verified working with **Qwen2.5-1.5B-Instruct** (Apache-2.0, *not* license-gated)
+and `tasks-genai:0.10.27` (see `app/build.gradle.kts`).
+
+### 1. Get a `.task` model (on the computer)
+Download an int8 `.task` bundle (~1.5 GB). This one is public — no login:
+```powershell
+curl.exe -L -C - -o qwen.task "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task"
+```
+Gemma `.task` bundles also work but are license-gated: accept Google's Gemma
+license on Hugging Face and download with an HF token.
+
+### 2. Push it to the phone (over USB, one time)
+The app loads the model from `/data/local/tmp/llm/gemma.task`:
+```powershell
+adb shell mkdir -p /data/local/tmp/llm
+adb push qwen.task /data/local/tmp/llm/gemma.task
+```
+> On some ROMs an app can't read `/data/local/tmp`. If the model won't load from
+> there, push it into the app's own storage instead and load it from there.
+
+### 3. Select it in the app
+In **Connect → LLM**: Provider **On-device (phone)** → **Save & test** → you
+should see "On-device model loaded and ready." Then unplug the cable and turn
+off Wi‑Fi/data — parsing still works, fully offline.
+
+### Notes
+- On-device runs the deterministic parser first and only calls the model when
+  that finds nothing (i.e. free-form/prose changelogs), so you won't always see
+  the model invoked for well-formed changelogs — that's intended.
+- Expect ~30-35 s per on-device generation for a 1.5B model on a phone CPU.
 
 ---
 

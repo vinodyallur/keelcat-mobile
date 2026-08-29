@@ -2,6 +2,7 @@ package com.keelcat.mobile.data.llm
 
 import android.content.Context
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import com.keelcat.mobile.domain.AffectedFile
 import com.keelcat.mobile.domain.BreakingChange
 import com.keelcat.mobile.domain.FixProposal
@@ -28,8 +29,6 @@ class LlmEngine(
         val options = LlmInference.LlmInferenceOptions.builder()
             .setModelPath(modelPath)
             .setMaxTokens(1024)
-            .setTopK(40)
-            .setTemperature(0.2f)
             .build()
         llm = LlmInference.createFromOptions(context, options)
     }
@@ -41,7 +40,14 @@ class LlmEngine(
 
     private fun infer(prompt: String): String {
         val engine = llm ?: error("LlmEngine.load() must be called first")
-        return engine.generateResponse(prompt)
+        val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
+            .setTopK(40)
+            .setTemperature(0.2f)
+            .build()
+        return LlmInferenceSession.createFromOptions(engine, sessionOptions).use { session ->
+            session.addQueryChunk(prompt)
+            session.generateResponse()
+        }
     }
 
     /** Extract breaking changes from a raw changelog. Runs fully on-device. */

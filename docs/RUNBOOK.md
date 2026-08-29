@@ -64,29 +64,38 @@ The **KeelCat** app appears in the launcher.
 
 ---
 
-## Step 4 — get a small on-device LLM and push it
+## Step 4 — put a small LLM on the phone (fully on-device)
 
-The app uses MediaPipe LLM Inference, which needs a `.task` model bundle on the
-device. Use a small instruction-tuned model so it runs comfortably on the phone
-(Gemma 3 1B is a good choice).
+The app uses MediaPipe LLM Inference (`tasks-genai:0.10.27`) and loads a `.task`
+model bundle from `/data/local/tmp/llm/gemma.task` on the device.
 
-1. Download a `.task` LLM bundle from the Google **LiteRT community** on Hugging
-   Face (e.g. a Gemma 3 1B instruct `.task`). You'll need to sign in and accept
-   the model license. Save it as `gemma.task`.
-2. Push it to the device at the path the app expects:
+Verified model: **Qwen2.5-1.5B-Instruct** (Apache-2.0, public, no login), int8,
+~1.5 GB.
+
+1. Download the `.task` on the computer:
+
+```powershell
+curl.exe -L -C - -o qwen.task "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task"
+```
+
+2. Push it to the path the app loads from:
 
 ```powershell
 adb shell mkdir -p /data/local/tmp/llm
-adb push gemma.task /data/local/tmp/llm/gemma.task
+adb push qwen.task /data/local/tmp/llm/gemma.task
 ```
 
-3. In the app's **Model path** field keep the default
-   `/data/local/tmp/llm/gemma.task` (or set it to wherever you pushed).
+3. In the app: **Connect → LLM → Provider: On-device (phone) → Save & test**.
+   You should see "On-device model loaded and ready."
 
-> If the app can't read `/data/local/tmp` on your device, instead copy the model
-> to the app's own storage using Android Studio's **Device Explorer**
-> (`/sdcard/Android/data/com.keelcat.mobile/files/gemma.task`) and set that path
-> in the Model path field.
+Then unplug and disable Wi‑Fi/data — changelog parsing still runs, on-device.
+
+> Gemma `.task` bundles also work but are license-gated (accept Google's Gemma
+> license on Hugging Face + download with an HF token).
+> If an app can't read `/data/local/tmp` on your ROM, push the model into the
+> app's own storage and load it from there instead.
+> On-device generation is ~30-35 s for a 1.5B model on a phone CPU; the app runs
+> its deterministic parser first and only calls the model for free-form changelogs.
 
 ---
 
