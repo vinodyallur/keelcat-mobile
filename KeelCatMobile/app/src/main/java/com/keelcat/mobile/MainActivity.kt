@@ -16,7 +16,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.keelcat.mobile.server.KeelCatServer
 
 class MainActivity : AppCompatActivity() {
@@ -39,6 +41,19 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = false
             isAppearanceLightNavigationBars = false
+        }
+
+        // Inset the whole WebView by the status bar, gesture bar and display
+        // cutout so content always sits inside the phone's boundaries. The
+        // padded area shows the brand-dark background, so it looks intentional.
+        val root = findViewById<View>(R.id.main)
+        root.setBackgroundColor(0xFF0B0B0F.toInt())
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
         }
 
         webView = findViewById(R.id.webview)
