@@ -135,10 +135,21 @@ class GitHubApi(private val token: String) {
             send("PUT", "$api/repos/$owner/$repo/contents/${enc(path)}", payload)
         }
 
-        val pr = JSONObject(
-            send("POST", "$api/repos/$owner/$repo/pulls",
-                JSONObject().put("title", title).put("head", branch).put("base", base).put("body", body))
-        )
+        // Open the PR — or, on an idempotent re-run of the same changelog, reuse
+        // the PR that already exists for this head branch. GitHub returns 422
+        // ("A pull request already exists for …") instead of creating a duplicate,
+        // so we look the existing one up and return it as RAISED (not an error).
+        val pr = runCatching {
+            JSONObject(
+                send("POST", "$api/repos/$owner/$repo/pulls",
+                    JSONObject().put("title", title).put("head", branch).put("base", base).put("body", body))
+            )
+        }.getOrElse { err ->
+            val existing = runCatching {
+                JSONArray(get("$api/repos/$owner/$repo/pulls?head=${enc(owner)}:${enc(branch)}&state=open&per_page=1"))
+            }.getOrNull()
+            if (existing != null && existing.length() > 0) existing.getJSONObject(0) else throw err
+        }
         return JSONObject()
             .put("number", pr.optInt("number"))
             .put("url", pr.optString("html_url"))
