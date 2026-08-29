@@ -51,7 +51,7 @@ class KeelViewModel(private val appContext: Context) : ViewModel() {
     private val _state = MutableStateFlow(KeelUiState())
     val state: StateFlow<KeelUiState> = _state.asStateFlow()
 
-    // How many source files to pull for scanning (kept small for a snappy demo).
+    // How many payment_method files to pull for scanning (kept small for a snappy demo).
     private val maxFilesToScan = 40
 
     fun updateConfig(transform: (Config) -> Config) {
