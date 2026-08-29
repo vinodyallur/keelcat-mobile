@@ -6,25 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>KeelCat — Self-Maintaining APIs</title>
     <style id="kc-native-shell">
-      /* Native-app shell: lock the layout, respect the notch + gesture bar. */
+      /* Native-app shell (used when wrapped in the Android WebView): lock the
+         layout, respect the notch + gesture bar. Harmless on desktop web. */
       html, body {
-        overflow-x: hidden !important;
-        -webkit-text-size-adjust: 100% !important;
-        text-size-adjust: 100% !important;
-        overscroll-behavior: none !important;
-        touch-action: pan-y;
+        -webkit-text-size-adjust: 100%;
+        -moz-text-size-adjust: 100%;
+             text-size-adjust: 100%;
       }
-      * { -webkit-tap-highlight-color: transparent; }
-      /* Don't let long-press select chrome/labels, but keep real content copyable. */
-      *:not(input):not(textarea):not(a):not(code):not(pre) {
-        -webkit-user-select: none;
-        user-select: none;
+      @media (max-width: 1023px) {
+        html, body { overscroll-behavior: none; overflow-x: hidden; }
+        header { padding-top: env(safe-area-inset-top); }
+        aside { padding-top: env(safe-area-inset-top); }
+        main { padding-bottom: calc(env(safe-area-inset-bottom) + 12px); }
       }
-      input, textarea, a, code, pre { -webkit-user-select: text; user-select: text; }
-      /* Push app chrome clear of the status bar / notch and the gesture bar. */
-      header { padding-top: env(safe-area-inset-top) !important; }
-      aside { padding-top: env(safe-area-inset-top) !important; }
-      main { padding-bottom: calc(env(safe-area-inset-bottom) + 12px) !important; }
     </style>
     <script>
       // Apply saved theme + skin before paint to avoid a flash of the wrong style.
@@ -43,11 +37,10 @@
         } catch (e) {}
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-BCIGE2jU.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-V3x2qSft.css">
+    <script type="module" crossorigin src="/assets/index-WubJfl9P.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BKSF6mQT.css">
   </head>
   <body>
-    <div id="root"></div>
-
+    <div id="root"></div>
   </body>
 </html>

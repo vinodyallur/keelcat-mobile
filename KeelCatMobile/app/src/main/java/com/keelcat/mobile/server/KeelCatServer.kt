@@ -47,12 +47,11 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
             path == "/config/llm" -> {
                 body.optString("provider").ifBlank { null }?.let { store.llmProvider = it }
                 body.optString("model").ifBlank { null }?.let { store.llmModel = it }
+                if (body.has("baseUrl")) store.llmBaseUrl = body.optString("baseUrl")
+                if (body.optString("apiKey").isNotBlank()) store.llmApiKey = body.optString("apiKey")
                 json(store.publicConfig())
             }
-            path == "/config/llm/test" -> json(
-                JSONObject().put("ok", llm.isReady()).put("model", store.llmModel)
-                    .put("sample", if (llm.isReady()) "on-device model ready" else "no model loaded — deterministic parsing active")
-            )
+            path == "/config/llm/test" -> json(testLlm())
             path == "/config/github" -> {
                 val pat = body.optString("pat")
                 if (pat.isNotBlank()) connectGitHub(pat)
@@ -103,7 +102,7 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
             path == "/auto/poll" -> json(JSONObject().put("ok", true).put("auto", autoStatus()))
 
             path == "/changelog/parse" -> {
-                val changes = ChangeEngine.parse(body.optString("text"), llm)
+                val changes = parseChanges(body.optString("text"))
                 json(JSONObject().put("changes", changes))
             }
             path == "/testkit/changelog" -> json(JSONObject().put("changelog", SAMPLE_CHANGELOG))
@@ -112,15 +111,21 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
             path == "/run" -> {
                 if (store.githubToken.isBlank()) return json(Response.Status.BAD_REQUEST, JSONObject().put("error", "Connect GitHub first"))
                 var changes = body.optJSONArray("changes") ?: JSONArray()
-                if (changes.length() == 0) changes = ChangeEngine.parse(body.optString("changelogText"), llm)
+                if (changes.length() == 0) changes = parseChanges(body.optString("changelogText"))
                 json(Pipeline.run(store, changes))
             }
             path == "/runs" -> json(store.runs())
             path == "/activity" -> json(store.activity())
 
-            path == "/security/status" -> jsonNull()
+            path == "/security/status" -> {
+                val cached = store.lastSecurityScanJson
+                if (cached.isBlank()) jsonNull() else json(JSONObject(cached))
+            }
             path == "/security/prs" -> jsonNull()
-            path == "/security/scan" -> json(emptyScan())
+            path == "/security/scan" -> {
+                if (store.githubToken.isBlank()) return json(Response.Status.BAD_REQUEST, JSONObject().put("error", "Connect GitHub first"))
+                json(SecurityScanner.scan(store))
+            }
             path == "/security/scan-prs" -> json(JSONObject().put("at", Store.now()).put("prs", JSONArray()).put("totals", emptyTotals()))
 
             path == "/billing" -> json(billing())
@@ -169,8 +174,55 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
     private fun emptyTotals(): JSONObject = JSONObject()
         .put("total", 0).put("critical", 0).put("high", 0).put("medium", 0).put("low", 0).put("status", "CLEAN")
 
-    private fun emptyScan(): JSONObject = JSONObject()
-        .put("at", Store.now()).put("repos", JSONArray()).put("totals", emptyTotals())
+    // ---- LLM engine selection: on-device vs local(Ollama) vs cloud ----
+    private fun isHttpLlm(): Boolean =
+        store.llmProvider in setOf("openrouter", "openai", "gemini", "ollama", "local", "custom")
+
+    private fun resolveBaseUrl(): String {
+        val custom = store.llmBaseUrl.trim()
+        return when (store.llmProvider) {
+            "openrouter" -> custom.ifBlank { "https://openrouter.ai/api/v1" }
+            "openai" -> custom.ifBlank { "https://api.openai.com/v1" }
+            "gemini" -> custom.ifBlank { "https://generativelanguage.googleapis.com/v1beta/openai" }
+            "ollama", "local", "custom" -> custom
+            else -> ""
+        }
+    }
+
+    private fun parseChanges(text: String): JSONArray {
+        if (text.isBlank()) return JSONArray()
+        if (isHttpLlm()) {
+            val base = resolveBaseUrl()
+            if (base.isNotBlank()) {
+                val res = runCatching {
+                    HttpLlm(base, store.llmApiKey, store.llmModel).parseChangelog(text)
+                }.getOrNull()
+                if (res != null && res.length() > 0) return res
+            }
+            return ChangeEngine.parseDeterministic(text) // graceful fallback
+        }
+        // on-device (MediaPipe) or disabled -> deterministic (+ on-device assist)
+        return ChangeEngine.parse(text, if (store.llmProvider == "on-device") llm else null)
+    }
+
+    private fun testLlm(): JSONObject = when (store.llmProvider) {
+        "disabled" -> JSONObject().put("ok", true).put("model", "deterministic")
+            .put("sample", "Deterministic parser active (no LLM needed).")
+        "on-device" -> JSONObject().put("ok", llm.isReady()).put("model", store.llmModel)
+            .put("sample", if (llm.isReady()) "On-device model loaded and ready." else "No model file found — deterministic parsing is active.")
+        else -> {
+            val base = resolveBaseUrl()
+            if (base.isBlank()) JSONObject().put("ok", false).put("model", store.llmModel)
+                .put("sample", "Set a base URL (e.g. http://127.0.0.1:11434/v1 for Ollama).")
+            else runCatching {
+                val sample = HttpLlm(base, store.llmApiKey, store.llmModel).ping()
+                JSONObject().put("ok", true).put("model", store.llmModel).put("sample", "$base replied: $sample")
+            }.getOrElse {
+                JSONObject().put("ok", false).put("model", store.llmModel)
+                    .put("sample", (it.message ?: "connection failed").take(160))
+            }
+        }
+    }
 
     // ---------------- static ----------------
     private fun serveStatic(uri: String): Response {

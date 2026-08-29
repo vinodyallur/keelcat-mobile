@@ -36,10 +36,24 @@ class Store(context: Context) {
         get() = prefs.getString("llmModelPath", "/data/local/tmp/llm/gemma.task") ?: "/data/local/tmp/llm/gemma.task"
         set(v) = prefs.edit().putString("llmModelPath", v).apply()
 
-    var hasLlmKey: Boolean
-        // On-device model counts as "have an LLM" once a model path is set.
-        get() = prefs.getBoolean("hasLlmKey", true)
-        set(v) = prefs.edit().putBoolean("hasLlmKey", v).apply()
+    // Base URL for an OpenAI-compatible LLM (local Ollama or a cloud provider).
+    var llmBaseUrl: String
+        get() = prefs.getString("llmBaseUrl", "") ?: ""
+        set(v) = prefs.edit().putString("llmBaseUrl", v).apply()
+
+    var llmApiKey: String
+        get() = prefs.getString("llmApiKey", "") ?: ""
+        set(v) = prefs.edit().putString("llmApiKey", v).apply()
+
+    // Whether an LLM is configured (on-device model, local server, or cloud key).
+    // "disabled" provider means deterministic parsing only.
+    val hasLlmKey: Boolean
+        get() = llmProvider != "disabled"
+
+    // Cached last security scan (JSON) so the Security page can show status.
+    var lastSecurityScanJson: String
+        get() = prefs.getString("lastSecurityScan", "") ?: ""
+        set(v) = prefs.edit().putString("lastSecurityScan", v).apply()
 
     var godMode: Boolean
         get() = prefs.getBoolean("godMode", false)
@@ -140,6 +154,7 @@ class Store(context: Context) {
         val llm = JSONObject()
             .put("provider", llmProvider)
             .put("model", llmModel)
+            .put("baseUrl", llmBaseUrl)
 
         val billing = JSONObject()
             .put("plan", "premium")   // on-device: unlimited, no paywall
