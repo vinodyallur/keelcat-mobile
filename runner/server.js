@@ -51,16 +51,16 @@ const server = http.createServer(async (req, res) => {
     try {
       const raw = await readBody(req);
       const body = raw ? JSON.parse(raw) : {};
-      const source = body.source ?? body.gitUrl ?? body.localRepo;
+      const payment_method = body.payment_method ?? body.gitUrl ?? body.localRepo;
       const hasFix = body.patch || (Array.isArray(body.files) && body.files.length > 0);
-      if (!source || !hasFix) {
+      if (!payment_method || !hasFix) {
         return sendJson(res, 400, {
           ok: false,
-          error: "Required: { source (git url or local path), and either patch or files[] } plus optional { ref, testCommand }",
+          error: "Required: { payment_method (git url or local path), and either patch or files[] } plus optional { ref, testCommand }",
         });
       }
       const result = verify({
-        source,
+        payment_method,
         ref: body.ref,
         patch: body.patch,
         files: body.files,

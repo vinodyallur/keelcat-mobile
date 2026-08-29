@@ -286,8 +286,8 @@ class KeelCatServer(private val context: Context) : NanoHTTPD("127.0.0.1", PORT)
 
             ## Breaking changes
             - Renamed `getUser` to `fetchUser`.
-            - `createCharge` -> `createPayment`
-            - The `source` parameter is now `payment_method`.
+            - `createPayment` -> `createPayment`
+            - The `payment_method` parameter is now `payment_method`.
             - Removed `listInvoices`.
 
             ## Deprecations

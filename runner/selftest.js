@@ -50,13 +50,13 @@ function main() {
     console.log(`unpatched test exit=${before.code} (expected non-zero)`);
 
     console.log("\n=== patch mode ===");
-    const viaPatch = verify({ source: src, patch: PATCH, testCommand: "node test.js" });
+    const viaPatch = verify({ payment_method: src, patch: PATCH, testCommand: "node test.js" });
     console.log(JSON.stringify(viaPatch, null, 2));
 
     console.log("\n=== files mode (what the phone sends) ===");
     const fixedAppJs = `import { fetchUser } from "./lib.js";\nexport const run = (id) => fetchUser(id).id;\n`;
     const viaFiles = verify({
-      source: src,
+      payment_method: src,
       files: [{ path: "app.js", content: fixedAppJs }],
       testCommand: "node test.js",
     });
