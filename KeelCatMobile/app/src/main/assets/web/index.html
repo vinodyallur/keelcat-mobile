@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/keelcat-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>KeelCat — Self-Maintaining APIs</title>
+    <style id="kc-native-shell">
+      /* Native-app shell: lock the layout, respect the notch + gesture bar. */
+      html, body {
+        overflow-x: hidden !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+        overscroll-behavior: none !important;
+        touch-action: pan-y;
+      }
+      * { -webkit-tap-highlight-color: transparent; }
+      /* Don't let long-press select chrome/labels, but keep real content copyable. */
+      *:not(input):not(textarea):not(a):not(code):not(pre) {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      input, textarea, a, code, pre { -webkit-user-select: text; user-select: text; }
+      /* Push app chrome clear of the status bar / notch and the gesture bar. */
+      header { padding-top: env(safe-area-inset-top) !important; }
+      aside { padding-top: env(safe-area-inset-top) !important; }
+      main { padding-bottom: calc(env(safe-area-inset-bottom) + 12px) !important; }
+    </style>
+    <script>
+      // Apply saved theme + skin before paint to avoid a flash of the wrong style.
+      (function () {
+        try {
+          var t = localStorage.getItem("apisteward.theme") || "dark";
+          var s = localStorage.getItem("apisteward.skin") || "skeuo";
+          var el = document.documentElement;
+          el.dataset.theme = t;
+          el.dataset.skin = s;
+          el.classList.toggle("dark", t === "dark");
+          el.style.background =
+            s === "skeuo"
+              ? t === "light" ? "#d8d5cd" : "#181a1e"
+              : t === "light" ? "#f6f7f9" : "#06070a";
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BCIGE2jU.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-V3x2qSft.css">
+  </head>
+  <body>
+    <div id="root"></div>
+
+  </body>
+</html>

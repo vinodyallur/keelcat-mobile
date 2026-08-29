@@ -1,0 +1,32 @@
+# ---- Android / Gradle ----
+.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keep the Gradle wrapper jar (needed to build) — do NOT ignore it.
+!gradle/wrapper/gradle-wrapper.jar
+
+# ---- IDE ----
+.idea/
+*.iml
+.vscode/
+
+# ---- Node (runner) ----
+node_modules/
+*.log
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- On-device model bundles (large, license-gated) ----
+*.task
+*.tflite
+*.bin

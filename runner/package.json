@@ -1,0 +1,12 @@
+{
+  "name": "keelcat-runner",
+  "version": "0.1.0",
+  "description": "Laptop-side verification runner for KeelCat Mobile. Applies a patch and runs the test suite, reachable from the phone over the Office Kit bridge.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "selftest": "node selftest.js"
+  },
+  "license": "MIT"
+}
