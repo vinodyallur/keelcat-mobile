@@ -18,7 +18,7 @@ data class BreakingChange(
     val summary: String,
 )
 
-/** A source file that references a changed symbol. */
+/** A payment_method file that references a changed symbol. */
 data class AffectedFile(
     val path: String,
     val content: String,
