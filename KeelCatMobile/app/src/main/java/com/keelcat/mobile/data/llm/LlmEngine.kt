@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 /**
  * On-device LLM. All inference runs on the phone (NPU/GPU/CPU via MediaPipe),
- * so changelogs and source code never leave the device.
+ * so changelogs and payment_method code never leave the device.
  *
  * Point [modelPath] at a small instruction-tuned model deployed to the device,
  * e.g. /data/local/tmp/llm/gemma.task pushed with `adb push`.
