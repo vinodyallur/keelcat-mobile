@@ -65,7 +65,7 @@ class GitHubClient(private val token: String) {
         }
     }
 
-    /** List source file paths in the repo (recursive tree of the default branch). */
+    /** List payment_method file paths in the repo (recursive tree of the default branch). */
     suspend fun listSourceFiles(repo: MonitoredRepo): List<String> = withContext(Dispatchers.IO) {
         val tree = get("$api/repos/${repo.slug}/git/trees/${repo.defaultBranch}?recursive=1")
         val arr = tree.optJSONArray("tree") ?: JSONArray()
