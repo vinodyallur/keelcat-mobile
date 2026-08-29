@@ -23,14 +23,14 @@ export function gitAvailable() {
   return sh("git", ["--version"]).code === 0;
 }
 
-// Clone source, optionally check out a ref, apply the fix (either a unified
+// Clone payment_method, optionally check out a ref, apply the fix (either a unified
 // diff via `patch`, or full-file replacements via `files`), run the test
 // command. Returns a structured, phone-friendly result.
-export function verify({ source, ref, patch, files, testCommand }) {
+export function verify({ payment_method, ref, patch, files, testCommand }) {
   const work = mkdtempSync(join(tmpdir(), "keelcat-"));
   const steps = [];
   try {
-    const clone = sh("git", ["clone", "--depth", "1", source, work]);
+    const clone = sh("git", ["clone", "--depth", "1", payment_method, work]);
     steps.push({ step: "clone", code: clone.code, log: clone.out.trim() });
     if (clone.code !== 0) {
       return { ok: false, applied: false, passed: false, stage: "clone", steps };
