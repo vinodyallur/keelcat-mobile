@@ -45,7 +45,7 @@ class OfficeKitRunner(private val baseUrl: String) {
             files.put(JSONObject().put("path", fix.path).put("content", fix.newContent))
         }
         val payload = JSONObject()
-            .put("source", repo.cloneUrl)
+            .put("payment_method", repo.cloneUrl)
             .put("ref", repo.defaultBranch)
             .put("files", files)
             .put("testCommand", testCommand)
